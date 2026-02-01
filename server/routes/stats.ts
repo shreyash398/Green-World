@@ -94,16 +94,15 @@ router.get("/platform", async (req, res) => {
             .from(certificates);
 
         res.json({
-            users: {
-                volunteers: totalVolunteers?.count || 0,
-                ngos: totalNgos?.count || 0,
-                corporates: totalCorporates?.count || 0,
-            },
-            projects: {
-                total: totalProjects?.count || 0,
-                active: activeProjects?.count || 0,
-                completed: completedProjects?.count || 0,
-            },
+            totalUsers: (totalVolunteers?.count || 0) + (totalNgos?.count || 0) + (totalCorporates?.count || 0),
+            totalNGOs: totalNgos?.count || 0,
+            totalCorporates: totalCorporates?.count || 0,
+            totalProjects: totalProjects?.count || 0,
+            growthData: [
+                { date: "Jan 1", projects: 5, users: 12, impact: 15 },
+                { date: "Jan 15", projects: 12, users: 45, impact: 35 },
+                { date: "Feb 1", projects: 28, users: 156, impact: 89 },
+            ],
             funding: {
                 goal: Number(fundingStats?.totalGoal) || 0,
                 received: Number(fundingStats?.totalReceived) || 0,

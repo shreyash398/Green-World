@@ -25,3 +25,7 @@ dist-ssr
 
 .config/
 !.env
+# Database
+*.db
+*.db-shm
+*.db-wal
