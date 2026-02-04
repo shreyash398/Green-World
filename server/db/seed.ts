@@ -1,5 +1,6 @@
 import { db } from "./index";
-import { users, projects, milestones, registrations, certificates } from "./schema";
+import { users, projects, milestones, registrations, certificates, projectPhotos } from "./schema";
+// @ts-ignore
 import bcrypt from "bcryptjs";
 import { runMigrations } from "./migrate";
 import { fileURLToPath } from 'node:url';
@@ -10,163 +11,385 @@ async function seed() {
     // Run migrations first
     runMigrations();
 
-    // Check if data already exists
-    const existingUsers = await db.select().from(users).limit(1);
-    if (existingUsers.length > 0) {
-        console.log("📦 Database already seeded, skipping...");
-        return;
+    // Clear existing data for a fresh demo experience
+    console.log("🧹 Clearing old data...");
+    try {
+        await db.delete(projectPhotos);
+        await db.delete(certificates);
+        await db.delete(registrations);
+        await db.delete(milestones);
+        await db.delete(projects);
+        await db.delete(users);
+    } catch (e) {
+        console.log("⚠️  Note: Some tables might already be empty or missing.");
     }
 
     // Create password hash for demo users
     const passwordHash = await bcrypt.hash("password123", 10);
 
-    // Insert demo users
+    // 1. Insert Admins
     const [adminUser] = await db.insert(users).values({
         email: "admin@greenworld.org",
         passwordHash,
-        name: "System Admin",
+        name: "Abhijit Magar",
         role: "admin",
     }).returning();
 
-    const [ngoUser1] = await db.insert(users).values({
-        email: "contact@greenearthsociety.org",
-        passwordHash,
-        name: "Green Earth Society",
-        role: "ngo",
-        organizationName: "Green Earth Society",
-    }).returning();
+    // 2. Insert NGOs
+    const ngos = await db.insert(users).values([
+        {
+            email: "contact@greenearthsociety.org",
+            passwordHash,
+            name: "Sarah Green",
+            role: "ngo",
+            organizationName: "Green Earth Society",
+        },
+        {
+            email: "info@oceanians.org",
+            passwordHash,
+            name: "Marcus Wave",
+            role: "ngo",
+            organizationName: "Ocean Guardians",
+        },
+        {
+            email: "contact@urbanlungs.org",
+            passwordHash,
+            name: "Dr. Elena Root",
+            role: "ngo",
+            organizationName: "Urban Lungs Initiative",
+        }
+    ]).returning();
 
-    const [ngoUser2] = await db.insert(users).values({
-        email: "info@oceanians.org",
-        passwordHash,
-        name: "Ocean Guardians",
-        role: "ngo",
-        organizationName: "Ocean Guardians",
-    }).returning();
+    // 3. Insert Corporate Users
+    const corporates = await db.insert(users).values([
+        {
+            email: "csr@techcorp.com",
+            passwordHash,
+            name: "TechCorp CSR Team",
+            role: "corporate",
+            organizationName: "TechCorp Inc.",
+        },
+        {
+            email: "impact@eco-logistics.net",
+            passwordHash,
+            name: "Eco-Logistics Global",
+            role: "corporate",
+            organizationName: "Eco-Logistics",
+        }
+    ]).returning();
 
-    const [volunteerUser] = await db.insert(users).values({
-        email: "volunteer@example.com",
-        passwordHash,
-        name: "John Doe",
-        role: "volunteer",
-    }).returning();
+    // 4. Insert Volunteers (30 volunteers)
+    const volunteerList = [];
+    const names = [
+        "John Doe", "Jane Smith", "Alex River", "Sam Forest", "Chris Cloud",
+        "Pat Leaf", "Terry Stone", "Lee Moss", "Kelly Stream", "Ryan Peak",
+        "Taylor Valley", "Morgan Lake", "Robin Glen", "Jordan Field", "Casey Wood",
+        "Aarav Sharma", "Zoe Chen", "Omar Hassan", "Yuki Tanaka", "Elena Rossi",
+        "Liam O'Brien", "Sofia Garcia", "Noah Wilson", "Mia Müller", "Lucas Silva",
+        "Amara Okafor", "Hirosh Gupta", "Emily Dupont", "Dmitry Volkov", "Isabella Conti"
+    ];
 
-    const [corporateUser] = await db.insert(users).values({
-        email: "csr@techcorp.com",
-        passwordHash,
-        name: "TechCorp CSR Team",
-        role: "corporate",
-        organizationName: "TechCorp Inc.",
-    }).returning();
+    for (const name of names) {
+        const email = `${name.toLowerCase().replace(" ", ".").replace("'", "")}@example.com`;
+        const [vol] = await db.insert(users).values({
+            email,
+            passwordHash,
+            name,
+            role: "volunteer",
+        }).returning();
+        volunteerList.push(vol);
+    }
 
-    // Insert demo projects
-    const [project1] = await db.insert(projects).values({
-        title: "Urban Forest Initiative",
-        description: "A large-scale project aimed at restoring the urban canopy in the heart of the city. We focused on planting native species like Neem, Peepal, and Banyan to improve local air quality.",
-        longDescription: "This initiative successfully transformed a 2-acre abandoned industrial plot into a thriving urban forest. Over 450 volunteers participated in the primary planting phase. The project now serves as a local 'green lung', reducing heat island effects by an average of 4°C in the immediate vicinity.",
-        location: "Mumbai, India",
-        fundingGoal: 50000,
-        fundingReceived: 35000,
-        status: "active",
-        impactType: "Trees",
-        impactValue: "5,000 trees",
-        carbonOffset: "3.2 tons/year",
-        image: "🌳",
-        ngoId: ngoUser1.id,
-    }).returning();
+    // 5. Insert Projects
+    const projectData = [
+        {
+            title: "Urban Forest Initiative",
+            description: "Restoring the urban canopy in Mumbai to improve air quality and reduce heat.",
+            longDescription: "This initiative transformed an abandoned industrial plot into a thriving 2-acre urban forest. Over 450 volunteers participated. It serves as a local 'green lung', reducing heat island effects by 4°C.",
+            location: "Mumbai, India",
+            fundingGoal: 50000,
+            fundingReceived: 35000,
+            status: "active" as const,
+            impactType: "Trees",
+            impactValue: "5,000",
+            carbonOffset: "3.2 tons/year",
+            image: "🌳",
+            ngoId: ngos[0].id,
+        },
+        {
+            title: "Coastal Cleanup Drive",
+            description: "Removing plastic and waste from coastal areas to protect marine wildlife.",
+            longDescription: "Focused on the Goa coastline, this drive mobilized youth to clear plastic accumulation. All waste is recycled through partner facilities.",
+            location: "Goa, India",
+            fundingGoal: 30000,
+            fundingReceived: 18000,
+            status: "active" as const,
+            impactType: "Waste",
+            impactValue: "5 tons",
+            carbonOffset: "0.8 tons/year",
+            image: "🌊",
+            ngoId: ngos[1].id,
+        },
+        {
+            title: "Mangrove Restoration",
+            description: "Restoring 2,000 hectares of mangrove forests crucial for coastal biodiversity.",
+            longDescription: "Working with local fishing communities to restore degraded mangrove ecosystems. Combines conservation with sustainable livelihoods.",
+            location: "Kerala, India",
+            fundingGoal: 45000,
+            fundingReceived: 45000,
+            status: "completed" as const,
+            impactType: "Trees",
+            impactValue: "2,000 ha",
+            carbonOffset: "15 tons/year",
+            image: "🌿",
+            ngoId: ngos[0].id,
+        },
+        {
+            title: "Water Harvesting System",
+            description: "Install rainwater harvesting in 50 rural villages for sustainable water access.",
+            location: "Rajasthan, India",
+            fundingGoal: 60000,
+            fundingReceived: 40000,
+            status: "active" as const,
+            impactType: "Water",
+            impactValue: "2.1M liters",
+            image: "💧",
+            ngoId: ngos[1].id,
+        },
+        {
+            title: "Smart Village Solar",
+            description: "Implementing solar micro-grids in remote off-grid villages.",
+            location: "Ladakh, India",
+            fundingGoal: 85000,
+            fundingReceived: 12000,
+            status: "active" as const,
+            impactType: "Energy",
+            impactValue: "150 kWh",
+            image: "☀️",
+            ngoId: ngos[2].id,
+        },
+        {
+            title: "School Garden Program",
+            description: "Setting up 100 organic gardens in public schools to teach sustainability.",
+            location: "Pune, India",
+            fundingGoal: 25000,
+            fundingReceived: 5000,
+            status: "active" as const,
+            impactType: "Trees",
+            impactValue: "100 gardens",
+            image: "🏫",
+            ngoId: ngos[0].id,
+        },
+        {
+            title: "Renewable Energy Hub",
+            description: "A community center powered entirely by wind and solar, providing free education.",
+            location: "Bangalore, India",
+            fundingGoal: 120000,
+            fundingReceived: 95000,
+            status: "active" as const,
+            impactType: "Energy",
+            impactValue: "500 kWh",
+            image: "🔋",
+            ngoId: ngos[0].id,
+        },
+        {
+            title: "Bio-Diversity Park",
+            description: "Creating a sanctuary for endangered local flora and fauna in the city heart.",
+            location: "Hyderabad, India",
+            fundingGoal: 75000,
+            fundingReceived: 62000,
+            status: "active" as const,
+            impactType: "Trees",
+            impactValue: "1,200 types",
+            image: "🦋",
+            ngoId: ngos[0].id,
+        },
+        {
+            title: "Solar Irrigation Pumps",
+            description: "Providing 500 small-scale farmers with solar-powered irrigation systems.",
+            location: "Gujarat, India",
+            fundingGoal: 90000,
+            fundingReceived: 15000,
+            status: "active" as const,
+            impactType: "Energy",
+            impactValue: "500 pumps",
+            image: "🚜",
+            ngoId: ngos[0].id,
+        },
+        {
+            title: "Plastic-Free Rivers",
+            description: "Installing automated trash barriers in 10 major city rivers.",
+            location: "Kolkata, India",
+            fundingGoal: 55000,
+            fundingReceived: 42000,
+            status: "active" as const,
+            impactType: "Waste",
+            impactValue: "12 tons",
+            image: "🏞️",
+            ngoId: ngos[1].id,
+        },
+        {
+            title: "Community Compost Network",
+            description: "Setting up decentralized composting for 200 apartment complexes.",
+            location: "Chennai, India",
+            fundingGoal: 40000,
+            fundingReceived: 38000,
+            status: "active" as const,
+            impactType: "Waste",
+            impactValue: "50 tons",
+            image: "♻️",
+            ngoId: ngos[0].id,
+        },
+        {
+            title: "Wildlife Corridor Protect",
+            description: "Securing lands for safe passage of elephants across highways.",
+            location: "Assam, India",
+            fundingGoal: 150000,
+            fundingReceived: 145000,
+            status: "completed" as const,
+            impactType: "Trees",
+            impactValue: "500 acres",
+            image: "🐘",
+            ngoId: ngos[0].id,
+        },
+        {
+            title: "Vertical Garden City",
+            description: "Transforming flyover pillars into vertical gardens.",
+            location: "Bangalore, India",
+            fundingGoal: 65000,
+            fundingReceived: 10000,
+            status: "active" as const,
+            impactType: "Trees",
+            impactValue: "20,000 plants",
+            image: "🏢",
+            ngoId: ngos[2].id,
+        },
+        {
+            title: "Smart Waste Bins",
+            description: "Installing IoT-enabled smart bins for efficient waste collection.",
+            location: "Surat, India",
+            fundingGoal: 35000,
+            fundingReceived: 5000,
+            status: "active" as const,
+            impactType: "Waste",
+            impactValue: "1,000 bins",
+            image: "🗑️",
+            ngoId: ngos[1].id,
+        },
+        {
+            title: "Green School Bus",
+            description: "Retrofitting 20 school buses with electric engines and solar roofs.",
+            location: "Mumbai, India",
+            fundingGoal: 200000,
+            fundingReceived: 50000,
+            status: "active" as const,
+            impactType: "Energy",
+            impactValue: "20 buses",
+            image: "🚌",
+            ngoId: ngos[0].id,
+        },
+        {
+            title: "Waste-to-Art Project",
+            description: "Converting city landfill waste into public art and furniture.",
+            location: "Delhi, India",
+            fundingGoal: 15000,
+            fundingReceived: 500,
+            status: "draft" as const,
+            impactType: "Waste",
+            impactValue: "2 tons",
+            image: "🎨",
+            ngoId: ngos[2].id,
+        }
+    ];
 
-    const [project2] = await db.insert(projects).values({
-        title: "Coastal Cleanup Drive",
-        description: "Remove plastic and waste from coastal areas to protect marine ecosystems and wildlife.",
-        longDescription: "Focused on the Goa coastline, this drive mobilized over 200 youths to clear devastating plastic accumulation. All collected waste was sent to our partner recycling facility.",
-        location: "Goa, India",
-        fundingGoal: 30000,
-        fundingReceived: 18000,
-        status: "active",
-        impactType: "Waste",
-        impactValue: "5 tons waste",
-        carbonOffset: "0.8 tons/year",
-        image: "🌊",
-        ngoId: ngoUser2.id,
-    }).returning();
+    const seededProjects = [];
+    for (const p of projectData) {
+        const [project] = await db.insert(projects).values({
+            title: p.title,
+            description: p.description,
+            longDescription: p.longDescription,
+            location: p.location,
+            fundingGoal: p.fundingGoal,
+            fundingReceived: p.fundingReceived,
+            status: p.status,
+            impactType: p.impactType,
+            impactValue: p.impactValue,
+            carbonOffset: p.carbonOffset,
+            image: p.image,
+            ngoId: p.ngoId,
+        }).returning();
+        seededProjects.push(project);
+    }
 
-    const [project3] = await db.insert(projects).values({
-        title: "Mangrove Restoration",
-        description: "Restore and protect 2,000 hectares of mangrove forests crucial for coastal biodiversity.",
-        longDescription: "Working with local fishing communities, we are restoring degraded mangrove ecosystems along the Kerala coast. This project combines conservation with sustainable livelihood generation.",
-        location: "Kerala, India",
-        fundingGoal: 45000,
-        fundingReceived: 45000,
-        status: "completed",
-        impactType: "Trees",
-        impactValue: "2,000 hectares",
-        carbonOffset: "15 tons/year",
-        image: "🌿",
-        ngoId: ngoUser1.id,
-    }).returning();
+    // 6. Insert Milestones
+    for (const project of seededProjects) {
+        const milestoneNames = ["Planning & Permits", "Community Engagement", "Initial Implementation", "Growth Phase", "Verification"];
+        const values = milestoneNames.map((name, index) => ({
+            projectId: project.id,
+            name,
+            completed: project.status === "completed" || (project.status === "active" && index < 2),
+            orderIndex: index
+        }));
+        await db.insert(milestones).values(values);
+    }
 
-    const [project4] = await db.insert(projects).values({
-        title: "Water Harvesting System",
-        description: "Install rainwater harvesting systems in 50 rural villages to provide sustainable water access.",
-        location: "Rajasthan, India",
-        fundingGoal: 60000,
-        fundingReceived: 40000,
-        status: "active",
-        impactType: "Water",
-        impactValue: "2.1M liters",
-        image: "💧",
-        ngoId: ngoUser2.id,
-    }).returning();
+    // 7. Insert Project Photos (Simulated)
+    for (const project of seededProjects) {
+        const photoUrls = [
+            "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&q=80&w=800",
+            "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=800",
+            "https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&q=80&w=800"
+        ];
+        for (const url of photoUrls) {
+            await db.insert(projectPhotos).values({
+                projectId: project.id,
+                url
+            });
+        }
+    }
 
-    // Insert milestones for projects
-    await db.insert(milestones).values([
-        { projectId: project1.id, name: "Site Preparation", completed: true, orderIndex: 0 },
-        { projectId: project1.id, name: "Community Education", completed: true, orderIndex: 1 },
-        { projectId: project1.id, name: "Mass Planting", completed: false, orderIndex: 2 },
-        { projectId: project1.id, name: "Initial Irrigation", completed: false, orderIndex: 3 },
-    ]);
+    // 8. Registrations (Distribute volunteers across projects)
+    for (const vol of volunteerList) {
+        // Register each volunteer for 1-3 random projects
+        const numProjects = Math.floor(Math.random() * 3) + 1;
+        const shuffled = [...seededProjects].filter(p => p.status !== "draft").sort(() => 0.5 - Math.random());
+        const selected = shuffled.slice(0, numProjects);
 
-    await db.insert(milestones).values([
-        { projectId: project2.id, name: "Area Scouting", completed: true, orderIndex: 0 },
-        { projectId: project2.id, name: "Equipment Distribution", completed: true, orderIndex: 1 },
-        { projectId: project2.id, name: "Collection Phase", completed: false, orderIndex: 2 },
-        { projectId: project2.id, name: "Sorting & Recycling", completed: false, orderIndex: 3 },
-    ]);
+        for (const project of selected) {
+            const hours = Math.floor(Math.random() * 20) + 5;
+            await db.insert(registrations).values({
+                userId: vol.id,
+                projectId: project.id,
+                hoursContributed: hours,
+            });
 
-    await db.insert(milestones).values([
-        { projectId: project3.id, name: "Initial Survey", completed: true, orderIndex: 0 },
-        { projectId: project3.id, name: "Site Preparation", completed: true, orderIndex: 1 },
-        { projectId: project3.id, name: "Planting Phase", completed: true, orderIndex: 2 },
-        { projectId: project3.id, name: "Monitoring", completed: true, orderIndex: 3 },
-    ]);
-
-    // Register volunteer for projects
-    await db.insert(registrations).values([
-        { userId: volunteerUser.id, projectId: project1.id, hoursContributed: 12 },
-        { userId: volunteerUser.id, projectId: project3.id, hoursContributed: 8 },
-    ]);
-
-    // Issue certificate for completed project
-    await db.insert(certificates).values({
-        userId: volunteerUser.id,
-        projectId: project3.id,
-        hours: 8,
-    });
+            // Issue certificate for completed projects or high contribution
+            if (project.status === "completed" || hours > 15) {
+                await db.insert(certificates).values({
+                    userId: vol.id,
+                    projectId: project.id,
+                    hours: hours,
+                });
+            }
+        }
+    }
 
     console.log("✅ Database seeded successfully!");
-    console.log("📧 Demo accounts created:");
-    console.log("   Admin: admin@greenworld.org / password123");
-    console.log("   NGO: contact@greenearthsociety.org / password123");
-    console.log("   Volunteer: volunteer@example.com / password123");
-    console.log("   Corporate: csr@techcorp.com / password123");
+    console.log("-----------------------------------");
+    console.log("📧 Demo accounts (password: password123):");
+    console.log(`👤 Admin: ${adminUser.email}`);
+    console.log(`🏢 Corporate: ${corporates[0].email}`);
+    console.log(`🏫 NGO: ${ngos[0].email}`);
+    console.log(`🙋 Volunteer: ${volunteerList[0].email}`);
+    console.log("-----------------------------------");
 }
 
 // Run if executed directly
-import { dirname } from 'node:path';
+import { fileURLToPath as fp } from 'node:url';
 
 const isDirectRun = () => {
     try {
-        const __filename = fileURLToPath(import.meta.url);
+        const __filename = fp(import.meta.url);
         return process.argv[1] === __filename;
     } catch {
         return false;

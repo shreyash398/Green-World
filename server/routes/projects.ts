@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../db";
-import { projects, milestones, projectPhotos, registrations, users } from "../db/schema";
+import { projects, milestones, projectPhotos, registrations, users, certificates } from "../db/schema";
 import { eq, like, and, desc, sql, count } from "drizzle-orm";
 import { authMiddleware, optionalAuthMiddleware, requireRole } from "../middleware/auth";
 import { z } from "zod";
@@ -179,7 +179,14 @@ router.post("/", authMiddleware, requireRole("ngo", "admin"), async (req, res) =
         }
 
         const [newProject] = await db.insert(projects).values({
-            ...result.data,
+            title: result.data.title,
+            description: result.data.description,
+            location: result.data.location,
+            fundingGoal: result.data.fundingGoal ?? 0,
+            impactType: result.data.impactType ?? "Trees",
+            impactValue: result.data.impactValue ?? "",
+            carbonOffset: result.data.carbonOffset ?? "",
+            image: result.data.image ?? "🌱",
             ngoId: req.user!.id,
             status: "active",
         }).returning();
@@ -211,6 +218,31 @@ router.put("/:id", authMiddleware, requireRole("ngo", "admin"), async (req, res)
             .set(req.body)
             .where(eq(projects.id, projectId))
             .returning();
+
+        // If project is marked as completed, issue certificates to all registered volunteers
+        if (updated && updated.status === "completed") {
+            const projectRegistrations = await db.select()
+                .from(registrations)
+                .where(eq(registrations.projectId, projectId));
+
+            for (const reg of projectRegistrations) {
+                // Check if certificate already exists to prevent duplicates
+                const [existingCert] = await db.select()
+                    .from(certificates)
+                    .where(and(
+                        eq(certificates.userId, reg.userId),
+                        eq(certificates.projectId, projectId)
+                    ));
+
+                if (!existingCert) {
+                    await db.insert(certificates).values({
+                        userId: reg.userId,
+                        projectId: projectId,
+                        hours: reg.hoursContributed,
+                    });
+                }
+            }
+        }
 
         res.json({ project: updated });
     } catch (error) {
@@ -279,6 +311,33 @@ router.post("/:id/register", authMiddleware, async (req, res) => {
     } catch (error) {
         console.error("Error registering for project:", error);
         res.status(500).json({ error: "Failed to register for project" });
+    }
+});
+
+// DELETE /api/projects/:id - Delete project
+router.delete("/:id", authMiddleware, requireRole("ngo", "admin"), async (req, res) => {
+    try {
+        const projectId = parseInt(req.params.id);
+
+        // Verify ownership
+        if (req.user!.role !== "admin") {
+            const [project] = await db.select()
+                .from(projects)
+                .where(eq(projects.id, projectId));
+
+            if (!project || project.ngoId !== req.user!.id) {
+                return res.status(403).json({ error: "Not authorized to delete this project" });
+            }
+        }
+
+        // Delete dependencies first (if needed) - cascade usually handles this or we do it manually
+        // For simplicity with better-sqlite3 and drizzle, let's just delete
+        await db.delete(projects).where(eq(projects.id, projectId));
+
+        res.json({ message: "Project deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting project:", error);
+        res.status(500).json({ error: "Failed to delete project" });
     }
 });
 

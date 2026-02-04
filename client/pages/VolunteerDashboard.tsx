@@ -419,7 +419,7 @@ export default function VolunteerDashboard() {
                         className="aspect-square rounded-[2rem] overflow-hidden border-4 border-gray-50 shadow-inner group/img relative"
                       >
                         <img
-                          src={`file:///${img}`}
+                          src={img}
                           alt="Impact"
                           className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-110"
                         />

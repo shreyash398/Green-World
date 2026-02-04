@@ -4,7 +4,7 @@ import { Sphere, Box } from "@react-three/drei";
 import * as THREE from "three";
 
 function FloatingElement({ position, color, size, speed }: any) {
-  const ref = useRef<THREE.Mesh>(null);
+  const ref = useRef<THREE.Group>(null);
 
   useFrame(() => {
     if (ref.current) {
@@ -29,7 +29,7 @@ function FloatingElement({ position, color, size, speed }: any) {
 }
 
 function FloatingBox({ position, color, scale, speed }: any) {
-  const ref = useRef<THREE.Mesh>(null);
+  const ref = useRef<THREE.Group>(null);
 
   useFrame(() => {
     if (ref.current) {

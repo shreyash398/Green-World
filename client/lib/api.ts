@@ -184,6 +184,12 @@ export const projectsApi = {
             method: "PUT",
         });
     },
+
+    async delete(id: number) {
+        return apiRequest<{ message: string }>(`/projects/${id}`, {
+            method: "DELETE",
+        });
+    },
 };
 
 // Volunteers API
@@ -224,5 +230,27 @@ export const statsApi = {
 
     async public() {
         return apiRequest<any>("/stats/public");
+    },
+};
+
+// Users API (Admin only)
+export const usersApi = {
+    async list() {
+        return apiRequest<{ users: AuthUser[] }>("/users");
+    },
+    async delete(id: number) {
+        return apiRequest<{ message: string }>(`/users/${id}`, {
+            method: "DELETE",
+        });
+    },
+};
+
+// NGO API
+export const ngoApi = {
+    async volunteers() {
+        return apiRequest<{ volunteers: any[] }>("/ngo/volunteers");
+    },
+    async funding() {
+        return apiRequest<{ funding: any[] }>("/ngo/funding");
     },
 };

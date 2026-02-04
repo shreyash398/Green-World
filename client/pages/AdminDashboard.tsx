@@ -11,7 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { statsApi, projectsApi } from "@/lib/api";
+import { statsApi, projectsApi, usersApi } from "@/lib/api";
 import { toast } from "sonner";
 import {
   LineChart,
@@ -27,6 +27,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [stats, setStats] = useState<any>(null);
   const [projects, setProjects] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -36,16 +37,27 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [statsRes, projectsRes] = await Promise.all([
+      const [statsRes, projectsRes, usersRes] = await Promise.all([
         statsApi.platform(),
         projectsApi.list({ status: "all" }),
+        usersApi.list(),
       ]);
       setStats(statsRes);
       setProjects(projectsRes.projects);
+      setUsers(usersRes.users);
     } catch (error: any) {
       toast.error("Failed to load admin data");
-    } finally {
-      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (id: number) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+    try {
+      await usersApi.delete(id);
+      toast.success("User deleted");
+      fetchData();
+    } catch (e) {
+      toast.error("Deletion failed");
     }
   };
 
@@ -253,17 +265,52 @@ export default function AdminDashboard() {
 
         {/* Users Tab */}
         {activeTab === "users" && (
-          <div className="bg-white rounded-xl border border-green-100 p-8">
-            <div className="text-center space-y-4">
-              <h3 className="text-2xl font-bold text-primary">
-                User Management
-              </h3>
-              <p className="text-gray-600">
-                Manage users, roles, and permissions
-              </p>
-              <button className="px-6 py-3 rounded-lg bg-primary text-white hover:bg-primary/90 transition-all font-semibold mt-4">
-                View All Users
-              </button>
+          <div className="bg-white rounded-xl border border-green-100 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-green-100 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-primary">User Management</h2>
+              <span className="badge-premium px-3 py-1 text-xs">{users.length} Total Users</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-green-100">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">User</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Role</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Organization</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Joined</th>
+                    <th className="px-6 py-4 text-right text-sm font-semibold text-gray-700">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {users.map((u) => (
+                    <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="font-semibold text-gray-900">{u.name}</div>
+                        <div className="text-xs text-gray-500">{u.email}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${u.role === 'admin' ? 'bg-red-100 text-red-600' :
+                          u.role === 'ngo' ? 'bg-primary/10 text-primary' :
+                            u.role === 'corporate' ? 'bg-blue-100 text-blue-600' :
+                              'bg-gray-100 text-gray-600'
+                          }`}>
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{u.organizationName || "-"}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{new Date(u.createdAt).toLocaleDateString()}</td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => handleDeleteUser(u.id)}
+                          className="text-red-600 hover:text-red-800 font-bold text-xs p-2 rounded-lg hover:bg-red-50 transition-all"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

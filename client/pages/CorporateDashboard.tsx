@@ -104,20 +104,19 @@ export default function CorporateDashboard() {
       <style dangerouslySetInnerHTML={{
         __html: `
         @media print {
-          body * { visibility: hidden !important; }
-          .print-only, .print-only * { visibility: visible !important; }
+          .no-print { display: none !important; }
           .print-only { 
-            position: fixed !important; 
+            visibility: visible !important;
+            display: block !important;
+            position: absolute !important; 
             left: 0 !important; 
             top: 0 !important; 
             width: 100% !important; 
-            height: 100% !important;
-            padding: 0 !important;
-            margin: 0 !important;
             background: white !important;
           }
-          .no-print { display: none !important; }
-          @page { size: auto; margin: 15mm; }
+          body { visibility: hidden !important; background: white !important; }
+          .print-only, .print-only * { visibility: visible !important; }
+          @page { size: auto; margin: 10mm; }
         }
       `}} />
       <div className="no-print">
@@ -134,9 +133,12 @@ export default function CorporateDashboard() {
                 Track your environmental impact and CSR spending
               </p>
             </div>
-            <button className="px-6 py-3 rounded-lg bg-primary text-white hover:bg-primary/90 transition-all flex items-center gap-2 font-semibold shadow-lg">
+            <button
+              onClick={() => window.location.href = '/projects'}
+              className="px-6 py-3 rounded-lg bg-primary text-white hover:bg-primary/90 transition-all flex items-center gap-2 font-semibold shadow-lg"
+            >
               <Plus className="w-5 h-5" />
-              New Project
+              Fund New Project
             </button>
           </div>
         </div>
@@ -334,9 +336,9 @@ export default function CorporateDashboard() {
 
       {/* Report Preview Modal */}
       {isReportOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm no-print">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-[2rem] max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50 no-print">
               <h2 className="text-xl font-bold text-primary">Report Preview</h2>
               <div className="flex gap-3">
                 <button
